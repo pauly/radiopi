@@ -27,9 +27,9 @@ Requires mpg321
 
 ## things to remember
 
-  Force the analog output of the pi; amixer cset numid=3 1
-  Mount a drive on the network; sudo mount -t cifs //LINKSTATION/share /mnt -o ip=192.168.1.65
+  * Force the analog output of the pi; amixer cset numid=3 1
+  * Mount a drive on the network; sudo mount -t cifs //LINKSTATION/share /mnt -o ip=192.168.1.65
 
 ## links
-  http://jeffskinnerbox.wordpress.com/2012/11/15/getting-audio-out-working-on-the-raspberry-pi/
-  http://www.mike-worth.com/2012/02/23/playing-youtube-music-from-the-command-line/
+  * http://jeffskinnerbox.wordpress.com/2012/11/15/getting-audio-out-working-on-the-raspberry-pi/
+  * http://www.mike-worth.com/2012/02/23/playing-youtube-music-from-the-command-line/
