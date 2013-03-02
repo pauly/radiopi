@@ -1,0 +1,5 @@
+#!/usr/bin/ruby
+require './lib/radiopi.rb'
+radio = RadioPi.new
+radio.show_queue
+radio.play
