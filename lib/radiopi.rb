@@ -1,5 +1,6 @@
 require 'yaml'
 require 'fileutils'
+require 'json'
 
 class RadioPi
 
@@ -47,17 +48,30 @@ class RadioPi
     @config
   end
 
+  def queue_file_name song = ''
+    self.get_config['queue_folder'] + '/' + song.gsub( /\W+/, '-' ) + '.json';
+  end
+
   # Add a song to the queue
   def add_to_queue song = ''
     if song
-      self.log 'todo: add ' + song + ' to the queue'
+      data = { 'song' => song }
+      file = self.queue_file_name( song )
+      if File.exists? file
+        self.log file + ' already in queue'
+      else
+        File.open( self.queue_file_name( song ), 'w' ) do | f |
+          f.write data.to_json
+        end
+      end
     end
   end
 
   # Add a song to the queue
   def jump_queue song = ''
     if song
-      self.log 'todo: add ' + song + ' to the front of the queue'
+      self.add_to_queue song
+      self.log 'todo: move ' + song + ' to the front of the queue - touch the file?'
     end
   end
 
@@ -82,7 +96,8 @@ class RadioPi
       song = self.queue_shift
       if song and File.exist?( song )
         self.log 'player is ' + self.get_config['player'] + ' and song is ' + song
-        system self.get_config['player'] + ' ' + song
+        system self.get_config['player'] + ' "' + song + '"'
+        self.scrobbler song
         status = 0
       else
         self.log 'cannot find ' + song
@@ -91,10 +106,17 @@ class RadioPi
     end
   end
 
+  def scrobble song = ''
+    p 'todo, write scrobbler. scrobbled ' + song
+  end
+
   def queue_shift
     queue = self.queue
-    song = queue.shift
-    FileUtils.rm song
+    file = queue.shift
+    self.log 'queue_shift, file was ' + file
+    song = JSON.parse( File.read( file ))['song']
+    self.log 'queue_shift, so song was ' + song
+    FileUtils.rm file
     self.log 'shifted ' + song + ' from the queue'
     song
   end
@@ -118,7 +140,7 @@ class RadioPi
   end
 
   def log message = ''
-    message = Time.now.strftime '%Y-%m-%d' + message + "\n"
+    message = Time.now.strftime '%Y-%m-%d %H:%M:%S ' + message + "\n"
     p message # just temporarily...
     File.open( self.get_log_file, 'a' ) do | handle |
       handle.write message
