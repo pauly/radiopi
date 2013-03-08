@@ -1,7 +1,6 @@
 #!/usr/bin/ruby
 require './lib/radiopi.rb'
 radio = RadioPi.new
-radio.add_to_queue '/mnt/Music/Motley Crue/Theatre of Pain/5 - Motley Crue - Home Sweet Home.mp3'
-radio.add_to_queue '/mnt/Music/Motley Crue/Theatre of Pain/2 - Motley Crue - Smokin\' in the Boys Room.mp3'
+radio.add_to_queue '/mnt/Music/Adam Buxton; Joe Cornish/Adam and Joe/00 - Adam Buxton; Joe Cornish - Pirate_Shoes.mp3'
 radio.show_queue
-radio.play
+radio.go
