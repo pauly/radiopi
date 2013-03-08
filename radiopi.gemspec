@@ -10,5 +10,8 @@ Gem::Specification.new do |s|
   s.homepage    = 'http://www.clarkeology.com/wiki/radiopi+ruby'
   s.executables << 'radiopi'
   s.executables << 'rpfind'
+  s.add_runtime_dependency "yaml"
+  s.add_runtime_dependency "fileutils"
+  s.add_runtime_dependency "json"
 end
 
