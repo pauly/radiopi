@@ -8,6 +8,9 @@ class RadioPi
   @log_file = nil
   @config = nil
 
+  def initialize
+  end
+
   # Display usage info
   def usage
     'usage goes here'
@@ -29,7 +32,7 @@ class RadioPi
   end
 
   # Write the config file
-  def put_config config = { 'player' => 'mpg321 -q', 'queue_folder' => '/tmp/radiopi_queue', 'base_folder' => '/mnt/Music', 'queue_size' => 5 }
+  def put_config config = { 'player' => 'mpg321 -o alsa -q', 'queue_folder' => '/tmp/radiopi_queue', 'base_folder' => '/mnt/Music', 'queue_size' => 5 }
     puts 'put_config got ' + config.to_s
     puts 'so writing ' + YAML.dump( config )
     File.open( self.get_config_file, 'w' ) do | handle |
@@ -44,6 +47,9 @@ class RadioPi
         self.put_config
       end
       @config = YAML.load_file self.get_config_file
+    end
+    if ! File.exists? @config['queue_folder']
+      FileUtils.mkdir_p @config['queue_folder']
     end
     @config
   end
@@ -77,9 +83,8 @@ class RadioPi
 
   # Play
   def go
-    self.log 'go!'
     while true
-      if ! self.play
+      if self.play != 0
         sleep 30
       end
     end
@@ -87,7 +92,6 @@ class RadioPi
  
   # Play the next song in the queue
   def play 
-    self.log 'playing...'
     status = 0
     if self.queue.length == 0
       self.log 'queue is empty!'
@@ -97,7 +101,7 @@ class RadioPi
       if song and File.exist?( song )
         self.log 'player is ' + self.get_config['player'] + ' and song is ' + song
         system self.get_config['player'] + ' "' + song + '"'
-        self.scrobbler song
+        self.scrobble song
         status = 0
       else
         self.log 'cannot find ' + song
