@@ -1,6 +1,7 @@
 #!/usr/bin/ruby
 require './lib/radiopi.rb'
 radio = RadioPi.new
+radio.put_config
 radio.add_to_queue '/mnt/Music/Adam Buxton; Joe Cornish/Adam and Joe/00 - Adam Buxton; Joe Cornish - Pirate_Shoes.mp3'
 radio.show_queue
 radio.go

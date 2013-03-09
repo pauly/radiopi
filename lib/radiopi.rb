@@ -1,14 +1,19 @@
 require 'yaml'
 require 'fileutils'
 require 'json'
+require 'taglib'
 
 class RadioPi
 
   @config_file = nil
   @log_file = nil
   @config = nil
+  @indexer = nil
+  @index
+  @player = nil
 
   def initialize
+    @index = { :songs => [ ], :artists => { }, :tags => { } }
   end
 
   # Display usage info
@@ -32,7 +37,7 @@ class RadioPi
   end
 
   # Write the config file
-  def put_config config = { 'player' => 'mpg321 -o alsa -q', 'queue_folder' => '/tmp/radiopi_queue', 'base_folder' => '/mnt/Music', 'queue_size' => 5 }
+  def put_config config = { 'player' => 'mpg321 -x -a hw:1,0 ', 'queue_folder' => '/tmp/radiopi_queue', 'base_folder' => '/mnt/Music/Various', 'queue_size' => 5 }
     puts 'put_config got ' + config.to_s
     puts 'so writing ' + YAML.dump( config )
     File.open( self.get_config_file, 'w' ) do | handle |
@@ -83,6 +88,12 @@ class RadioPi
 
   # Play
   def go
+    @indexer = Thread.new do
+      self.log 'indexing in a new thread...'
+      self.index
+      self.log 'done indexing...'
+    end
+    self.log 'now starting to play...'
     while true
       if self.play != 0
         sleep 30
@@ -93,10 +104,13 @@ class RadioPi
   # Play the next song in the queue
   def play 
     status = 0
-    if self.queue.length == 0
-      self.log 'queue is empty!'
-      status = -1
-    else
+    if self.queue.length < self.get_config['queue_size']
+      self.log 'queue is empty! picking randomly from ' + @index[:songs].length.to_s + ' songs in index...'
+      for i in 0..self.get_config['queue_size'] do
+        add_to_queue @index[:songs][ rand( @index[:songs].length ) ]
+      end
+    end
+    if self.queue.length != 0
       song = self.queue_shift
       if song and File.exist?( song )
         self.log 'player is ' + self.get_config['player'] + ' and song is ' + song
@@ -117,9 +131,7 @@ class RadioPi
   def queue_shift
     queue = self.queue
     file = queue.shift
-    self.log 'queue_shift, file was ' + file
     song = JSON.parse( File.read( file ))['song']
-    self.log 'queue_shift, so song was ' + song
     FileUtils.rm file
     self.log 'shifted ' + song + ' from the queue'
     song
@@ -144,10 +156,35 @@ class RadioPi
   end
 
   def log message = ''
-    message = Time.now.strftime '%Y-%m-%d %H:%M:%S ' + message + "\n"
+    message = Time.now.strftime '%Y-%m-%d %H:%M:%S ' + message.to_s + "\n"
     p message # just temporarily...
     File.open( self.get_log_file, 'a' ) do | handle |
       handle.write message
+    end
+  end
+
+  def index folder = nil
+    self.log 'called index with ' + folder.to_s
+    folder ||= self.get_config['base_folder']
+    self.log 'looking for files in ' + folder
+    files = Dir.entries folder
+    files.each do | file_name |
+      if file_name !~ /^\./
+        path = folder + '/' + file_name
+        if File.directory? path
+          self.index path
+        else
+          @index[:songs].push path
+	  TagLib::FileRef.open path do | f |
+            @index[:artists][f.tag.artist] ||= []
+            @index[:artists][f.tag.artist].push path
+	    f.tag.genre.split(';').map(&:strip).each do | tag |
+              @index[:tags][tag] ||= []
+              @index[:tags][tag].push path
+            end
+          end
+        end
+      end
     end
   end
 
