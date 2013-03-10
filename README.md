@@ -37,7 +37,3 @@ Requires mpg321
   * http://www.raspberrypi.org/phpBB3/viewtopic.php?f=45&t=26388&p=238791&hilit=keene#p238791
   * http://www.include.gr/debian/mpg321/
 
-## todo
-  * Choose the right sound device to et rid of this error!
-   ALSA lib confmisc.c:1286:(snd_func_refer) Unable to find definition 'cards.BRCM bcm2835 AL.pcm.front.0:CARD=0'
-
