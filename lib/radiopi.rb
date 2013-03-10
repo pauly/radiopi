@@ -7,6 +7,7 @@ class RadioPi
 
   @config_file = nil
   @log_file = nil
+  @index_file = nil
   @config = nil
   @indexer = nil
   @index
@@ -31,13 +32,18 @@ class RadioPi
     @config_file || File.expand_path('~') + '/radiopi_config.yml'
   end
 
+  # Index file getter
+  def get_index_file
+    @index_file || File.expand_path('~') + '/radiopi_index.json'
+  end
+
   # Log file getter
   def get_log_file
     @log_file || File.expand_path('~') + '/radiopi.log'
   end
 
   # Write the config file
-  def put_config config = { 'player' => 'mpg321 -x -a hw:1,0 ', 'queue_folder' => '/tmp/radiopi_queue', 'base_folder' => '/mnt/Music/Various', 'queue_size' => 5 }
+  def put_config config = { 'player' => 'mpg321 -q -x -a hw:1,0 ', 'queue_folder' => '/tmp/radiopi_queue', 'base_folder' => '/mnt/Music/Various/Classic Axe/', 'queue_size' => 5 }
     puts 'put_config got ' + config.to_s
     puts 'so writing ' + YAML.dump( config )
     File.open( self.get_config_file, 'w' ) do | handle |
@@ -99,6 +105,7 @@ class RadioPi
         sleep 30
       end
     end
+    @indexer.join
   end
  
   # Play the next song in the queue
@@ -107,7 +114,9 @@ class RadioPi
     if self.queue.length < self.get_config['queue_size']
       self.log 'queue is empty! picking randomly from ' + @index[:songs].length.to_s + ' songs in index...'
       for i in 0..self.get_config['queue_size'] do
-        add_to_queue @index[:songs][ rand( @index[:songs].length ) ]
+        song = @index[:songs][ rand( @index[:songs].length ) ]
+	self.log 'adding ' + song + ' to queue'
+        add_to_queue song
       end
     end
     if self.queue.length != 0
@@ -164,26 +173,37 @@ class RadioPi
   end
 
   def index folder = nil
-    self.log 'called index with ' + folder.to_s
-    folder ||= self.get_config['base_folder']
-    self.log 'looking for files in ' + folder
+    write_index = false
+    self.log 'indexing ' + folder.to_s
+    if ! folder
+      folder = self.get_config['base_folder']
+      write_index = true
+    end
     files = Dir.entries folder
     files.each do | file_name |
       if file_name !~ /^\./
         path = folder + '/' + file_name
         if File.directory? path
           self.index path
-        else
-          @index[:songs].push path
+	elsif path =~ /\.(mp3|flac|ogg)$/
+          relative_path = path.gsub self.get_config['base_folder'], ''
+          @index[:songs].push relative_path
 	  TagLib::FileRef.open path do | f |
             @index[:artists][f.tag.artist] ||= []
-            @index[:artists][f.tag.artist].push path
+            @index[:artists][f.tag.artist].push relative_path
 	    f.tag.genre.split(';').map(&:strip).each do | tag |
               @index[:tags][tag] ||= []
-              @index[:tags][tag].push path
+              @index[:tags][tag].push relative_path
             end
           end
+	else
+	  self.log file_name + ' does not match'
         end
+      end
+    end
+    if write_index
+      File.open( self.get_index_file, 'w' ) do | handle |
+        handle.write @index.to_json
       end
     end
   end
