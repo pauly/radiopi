@@ -2,6 +2,7 @@ require 'yaml'
 require 'fileutils'
 require 'json'
 require 'taglib'
+require 'lastfm'
 
 class RadioPi
 
@@ -12,9 +13,18 @@ class RadioPi
   @indexer = nil
   @index
   @player = nil
+  @lastfm = nil
 
   def initialize
-    @index = { :songs => [ ], :artists => { }, :tags => { } }
+    @index = { }
+    if File.exists? self.get_index_file
+      begin
+        @index = JSON.parse( File.read( self.get_index_file ))
+      rescue
+	self.log 'failed parsing ' + self.get_index_file
+      end
+    end
+    @index = { 'songs' => { }, 'artists' => { }, 'tags' => { } }.merge @index
   end
 
   # Display usage info
@@ -27,23 +37,34 @@ class RadioPi
     help = self.usage + "\n"
   end
 
+  # Display help
+  def home_dir
+    begin
+      File.expand_path('~')
+    rescue
+      '/tmp/radiopi'
+    end
+  end
+
   # Config file getter
   def get_config_file
-    @config_file || File.expand_path('~') + '/radiopi_config.yml'
+    @config_file || self.home_dir + '/radiopi_config.yml'
   end
 
   # Index file getter
   def get_index_file
-    @index_file || File.expand_path('~') + '/radiopi_index.json'
+    @index_file || self.home_dir + '/radiopi_index.json'
   end
 
   # Log file getter
   def get_log_file
-    @log_file || File.expand_path('~') + '/radiopi.log'
+    @log_file || self.home_dir + '/radiopi.log'
   end
 
   # Write the config file
-  def put_config config = { 'player' => 'mpg321 -q -x -a hw:1,0 ', 'queue_folder' => '/tmp/radiopi_queue', 'base_folder' => '/mnt/Music/Various/Classic Axe/', 'queue_size' => 5 }
+  # does -R work in background mode?
+  # def put_config config = { 'player' => 'mpg321 -R -q -a hw:1,0 ', 'queue_folder' => '/tmp/radiopi_queue', 'base_folder' => '/mnt/Music/', 'queue_size' => 5 }
+  def put_config config = { 'player' => 'mpg321 -q -a hw:1,0 ', 'queue_folder' => '/tmp/radiopi_queue', 'base_folder' => '/mnt/Music/', 'queue_size' => 5 }
     puts 'put_config got ' + config.to_s
     puts 'so writing ' + YAML.dump( config )
     File.open( self.get_config_file, 'w' ) do | handle |
@@ -94,12 +115,9 @@ class RadioPi
 
   # Play
   def go
-    @indexer = Thread.new do
-      self.log 'indexing in a new thread...'
-      self.index
-      self.log 'done indexing...'
-    end
-    self.log 'now starting to play...'
+    # @indexer = Thread.new do
+    #   self.index
+    # end
     while true
       if self.play != 0
         sleep 30
@@ -112,19 +130,22 @@ class RadioPi
   def play 
     status = 0
     if self.queue.length < self.get_config['queue_size']
-      self.log 'queue is empty! picking randomly from ' + @index[:songs].length.to_s + ' songs in index...'
-      for i in 0..self.get_config['queue_size'] do
-        song = @index[:songs][ rand( @index[:songs].length ) ]
-	self.log 'adding ' + song + ' to queue'
-        add_to_queue song
+      self.log 'queue is empty!';
+      if @index['songs'].keys.length
+        self.log 'picking randomly from ' + @index['songs'].keys.length.to_s + ' songs in index...'
+        for i in 0..self.get_config['queue_size'] do
+          r = rand( @index['songs'].keys.length )
+          song = @index['songs'].keys[ r ]
+          add_to_queue song
+	end
       end
     end
     if self.queue.length != 0
       song = self.queue_shift
       if song and File.exist?( song )
         self.log 'player is ' + self.get_config['player'] + ' and song is ' + song
-        system self.get_config['player'] + ' "' + song + '"'
         self.scrobble song
+        system self.get_config['player'] + ' "' + song + '" 2> /dev/null'
         status = 0
       else
         self.log 'cannot find ' + song
@@ -134,7 +155,28 @@ class RadioPi
   end
 
   def scrobble song = ''
-    p 'todo, write scrobbler. scrobbled ' + song
+    artist = nil, track = nil
+    TagLib::FileRef.open song do | f |
+      # p f.tag.inspect
+      artist = f.tag.artist
+      track = f.tag.title
+    end
+    if artist and track
+      if !@lastfm and self.get_config['lastfm_api_key']
+        @lastfm = Lastfm.new self.get_config['lastfm_api_key'], self.get_config['lastfm_api_secret']
+	token = self.get_config['lastfm_api_token'] or @lastfm.auth.get_token
+	# p 'token is ' + token.to_s + ', so http://www.last.fm/api/auth/?api_key=' + self.get_config['lastfm_api_key'] + '&token=' + token
+	# p '(or should that be http://www.last.fm/api/auth/?api_key=' + self.get_config['lastfm_api_key'] + '&token=' + self.get_config['lastfm_api_token'] + ')'
+        @lastfm.session = @lastfm.auth.get_session( :token => token )['key']
+      end
+      if @lastfm
+        # p 'got lastfm, so scrobble ' + track.to_s
+        # @lastfm.track.update_now_playing :artist => artist, :track => track
+        @lastfm.track.scrobble :artist => artist, :track => track
+      else
+        p 'todo, write scrobbler and scrobble ' + artist + ' and ' + song
+      end
+    end
   end
 
   def queue_shift
@@ -173,8 +215,9 @@ class RadioPi
   end
 
   def index folder = nil
-    write_index = false
-    self.log 'indexing ' + folder.to_s
+    # write_index = false
+    write_index = true # what the hell write on every folder
+    # self.log 'indexing ' + folder.to_s
     if ! folder
       folder = self.get_config['base_folder']
       write_index = true
@@ -185,15 +228,15 @@ class RadioPi
         path = folder + '/' + file_name
         if File.directory? path
           self.index path
+	elsif path =~ /Unclassified/
 	elsif path =~ /\.(mp3|flac|ogg)$/
-          relative_path = path.gsub self.get_config['base_folder'], ''
-          @index[:songs].push relative_path
+          @index['songs'][path] = 1
 	  TagLib::FileRef.open path do | f |
-            @index[:artists][f.tag.artist] ||= []
-            @index[:artists][f.tag.artist].push relative_path
+            # @index['artists'][f.tag.artist] ||= { }
+            # @index['artists'][f.tag.artist][ path ] = 1
 	    f.tag.genre.split(';').map(&:strip).each do | tag |
-              @index[:tags][tag] ||= []
-              @index[:tags][tag].push relative_path
+              @index['tags'][tag] ||= { }
+              @index['tags'][tag][ path ] = 1
             end
           end
 	else
@@ -202,9 +245,14 @@ class RadioPi
       end
     end
     if write_index
-      File.open( self.get_index_file, 'w' ) do | handle |
-        handle.write @index.to_json
+      index_file = self.get_index_file
+      temp_file = index_file + '.' + Time.now.to_f.to_s
+      File.open( temp_file, 'w' ) do | handle |
+        # handle.write @index.to_json
+        handle.write JSON.pretty_generate( @index )
       end
+      FileUtils.mv temp_file, index_file
+      self.log 'replaced ' + index_file + ' with ' + temp_file
     end
   end
 
