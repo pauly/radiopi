@@ -1,6 +1,6 @@
 #!/usr/bin/ruby
-# just a test script, wipes the config before playing
+# just a test script, wipes the config before playing (if you uncomment that line)
 require './lib/radiopi.rb'
 radio = RadioPi.new
-radio.put_config
+# radio.put_config
 radio.go
