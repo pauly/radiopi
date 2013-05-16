@@ -11,7 +11,7 @@ class RadioPi
   @index_file = nil
   @config = nil
   @indexer = nil
-  @index
+  @index = nil
   @player = nil
   @lastfm = nil
 
@@ -155,24 +155,41 @@ class RadioPi
   end
 
   def scrobble song = ''
-    artist = nil, track = nil
+    artist = nil, track = nil, tags = nil
     TagLib::FileRef.open song do | f |
       # p f.tag.inspect
       artist = f.tag.artist
       track = f.tag.title
+      if f.tag.genre
+        tags = f.tag.genre.downcase.split( ';' ).map( &:strip ).join( ',' )
+      end
     end
     if artist and track
-      if !@lastfm and self.get_config['lastfm_api_key']
-        @lastfm = Lastfm.new self.get_config['lastfm_api_key'], self.get_config['lastfm_api_secret']
-	token = self.get_config['lastfm_api_token'] or @lastfm.auth.get_token
-	# p 'token is ' + token.to_s + ', so http://www.last.fm/api/auth/?api_key=' + self.get_config['lastfm_api_key'] + '&token=' + token
-	# p '(or should that be http://www.last.fm/api/auth/?api_key=' + self.get_config['lastfm_api_key'] + '&token=' + self.get_config['lastfm_api_token'] + ')'
-        @lastfm.session = @lastfm.auth.get_session( :token => token )['key']
+      if self.get_config['lastfm_api_key']
+        if ! @lastfm
+          @lastfm = Lastfm.new self.get_config['lastfm_api_key'], self.get_config['lastfm_api_secret']
+        end
+        if self.get_config['lastfm_api_session']
+          @lastfm.session = self.get_config['lastfm_api_session']
+        else
+	  # token = @lastfm.auth.get_token
+	  token = self.get_config['lastfm_api_token']
+	  p 'token is ' + token.to_s + ', so http://www.last.fm/api/auth/?api_key=' + self.get_config['lastfm_api_key'] + '&token=' + token
+	  begin
+            session = @lastfm.auth.get_session( :token => token )['key']
+	    p 'so session is ' + session
+            @lastfm.session = session
+	  rescue
+	    token = @lastfm.auth.get_token
+            p 'need to authenticate http://www.last.fm/api/auth/?api_key=' + self.get_config['lastfm_api_key'] + '&token=' + token
+          end
+	end
       end
       if @lastfm
         # p 'got lastfm, so scrobble ' + track.to_s
-        # @lastfm.track.update_now_playing :artist => artist, :track => track
+        @lastfm.track.update_now_playing :artist => artist, :track => track
         @lastfm.track.scrobble :artist => artist, :track => track
+        @lastfm.track.add_tags :artist => artist, :track => track, :tags => tags
       else
         p 'todo, write scrobbler and scrobble ' + artist + ' and ' + song
       end
@@ -234,10 +251,12 @@ class RadioPi
 	  TagLib::FileRef.open path do | f |
             # @index['artists'][f.tag.artist] ||= { }
             # @index['artists'][f.tag.artist][ path ] = 1
-	    f.tag.genre.split(';').map(&:strip).each do | tag |
-              @index['tags'][tag] ||= { }
-              @index['tags'][tag][ path ] = 1
-            end
+            if f.tag.genre
+	      f.tag.genre.split(';').map(&:strip).each do | tag |
+                @index['tags'][tag] ||= { }
+                @index['tags'][tag][ path ] = 1
+              end
+	    end
           end
 	else
 	  self.log file_name + ' does not match'
