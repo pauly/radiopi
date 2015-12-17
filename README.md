@@ -2,7 +2,8 @@
 
 Builds and plays a queue of mp3s, interspersed with jingles. For an in car pi based radio station.
 
-A work very much in progress!
+ABANDONATED NOW MPD does all of this doesn't it so I'll be moving my efforts there...
+http://www.clarkeology.com/m/23753/Realised+my+old+radiopi+idea+already+exists
 
 Requires mpg321
 
