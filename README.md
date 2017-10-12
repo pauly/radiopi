@@ -1,30 +1,33 @@
-# radiopi
+# radiopi
 
-Builds and plays a queue of mp3s, interspersed with jingles. For an in car pi based radio station.
+> A Vue.js project
 
-ABANDONATED NOW MPD does all of this doesn't it so I'll be moving my efforts there...
-http://www.clarkeology.com/m/23753/Realised+my+old+radiopi+idea+already+exists
+## Build Setup
 
-Requires mpg321
+``` bash
+# install dependencies
+npm install
 
-## the plan
+# serve with hot reload at localhost:8080
+npm run dev
 
-  * Queue builder
-    * Queue builder runs every minute, checking for requests and building a queue.
-    * If a request has come in, add it to the queue.
-    * If a priority request has come in, add it to the front of the queue.
-    * If a jingle is due, add it to the front of the queue.
-    * If a priority jingle is due, stop the current song and play it now.
-    * If less than n songs in the queue, add a song to the queue.
-    * Check the GPS, if a location based song is appropriate add it to the front of the queue.
+# build for production with minification
+npm run build
 
-  * Player
-    * Runs in an endless loop
-    * Pick the track from the front of the queue, play it, remove it from the queue
+# build for production and view the bundle analyzer report
+npm run build --report
 
-## history
+# run unit tests
+npm run unit
 
-  * v 0.0.1 first build
+# run e2e tests
+npm run e2e
+
+# run all tests
+npm test
+```
+
+For a detailed explanation on how things work, check out the [guide](http://vuejs-templates.github.io/webpack/) and [docs for vue-loader](http://vuejs.github.io/vue-loader).
 
 ## things to remember
 
