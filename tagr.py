@@ -38,7 +38,7 @@ def get_rating(file):
             if frame.FrameID == 'POPM':
                 return getattr(frame, 'rating', 0)
     except ID3NoHeaderError:
-        print(file, 'not mp3')
+        print(file, 'no id3 header')
     return 0
 
 def rate_it(file, direction, recurse = True):
@@ -55,7 +55,11 @@ def rate_it(file, direction, recurse = True):
     count = 1
     if (direction < 0):
         delta = delta * -1
-    audio = ID3(file)
+    try:
+        audio = ID3(file)
+    except ID3NoHeaderError:
+        print(file, 'no id3 header')
+        return 0
     print('rating', audio.getall('POPM'))
     for frame in audio.values():
         if frame.FrameID == 'POPM':
@@ -75,6 +79,10 @@ def rate_it(file, direction, recurse = True):
         if tag not in tag_weight.keys():
             tag_weight[tag] = 128
         tag_weight[tag] += delta
+        if tag_weight[tag] > 256:
+            tag_weight[tag] = 256
+        if tag_weight[tag] < 0:
+            tag_weight[tag] = 0
     print(tag_weight)
     save_tags(tag_weight)
     return rating
@@ -86,11 +94,12 @@ def get_tags(file):
     tags = []
     try:
         audio = ID3(file)
-        for frame in audio.values():
-            if frame.FrameID == 'TCON':
-                tags = getattr(frame, 'text', 0)
     except ID3NoHeaderError:
-        print(file, 'not mp3')
+        print(file, 'no id3 header')
+        return tags
+    for frame in audio.values():
+        if frame.FrameID == 'TCON':
+            tags = getattr(frame, 'text', 0)
     for i in range(len(tags)):
         tags[i] = tags[i].rstrip()
     tags.sort()
@@ -112,7 +121,12 @@ def tag_it(file, tag = None, recurse = True):
     if tag not in tags:
         tags.append(tag)
         tags.sort()
-    audio = ID3(file)
+    try:
+        audio = ID3(file)
+    except ID3NoHeaderError:
+        print(file, 'no id3 header')
+        return
+    
     audio.add(TCON(encoding=3, text=tags))
     audio.save()
     print('now', tags)
@@ -125,16 +139,18 @@ def untag_it(file, tag = None, recurse = True):
         for realFile in listdir(file):
             untag_it(file + '/' + realFile, tag, RECURSE)
         return
+    try:
+        audio = ID3(file)
+    except ID3NoHeaderError:
+        print(file, 'no id3 header')
+        return
 
     tags = get_tags(file)
     if tag != None:
         tag = ucfirst(tag)
         for i in range(len(tags) - 1, -1, -1):
-            print(i, tags[i], '==', tag)
             if tags[i] == tag:
-                print('deleting', i)
                 del tags[i]
-        audio = ID3(file)
         audio.add(TCON(encoding=3, text=tags))
         audio.save()
     print('now', tags)
@@ -143,24 +159,67 @@ def untag_it(file, tag = None, recurse = True):
 def folderify(name):
     return sub('/', '', ', '.join(name))
 
-def rename_by_tag(file, tag = None, value = None, recurse = True):
+def strip_chars(str):
+    str = sub('\[.*', '', str)
+    str = sub('\(.*', '', str)
+    str = sub('^\W', '', str)
+    str = sub('\W$', '', str)
+    str = sub('[^A-Za-z0-9\s]', '', str)
+    return str
+
+def rename_by_file(file, recurse = True):
     if path.isdir(file):
         for realFile in listdir(file):
-            rename_by_tag(file + '/' + realFile, tag, value, True)
+            rename_by_file(file + '/' + realFile, True)
         return
 
     file = sub(r'\/+', '/', file)
-    audio = EasyID3(file)
-    # print(EasyID3.valid_keys.keys())
+    try:
+        audio = EasyID3(file)
+    except:
+        print(file, 'no id3 header')
+        return
+    fileName = file.split('/').pop()
+    parts = fileName.split('-')
+    artist = parts[0]
+    title = parts[1]
+    if artist == 'NA':
+        artist = parts[1]
+        title = parts[2]
+    title = sub(' Official Video', '', title)
+    title = sub(' Official Lyric Video', '', title)
+    title = sub(' Official Music Video', '', title)
+    if 'artist' not in audio:
+        rename_by_tag(file, 'artist', strip_chars(artist), True)
+    # if 'title' not in audio:
+    #   rename_by_tag(file, 'title', strip_chars(title), True)
+    rename_by_tag(file, 'title', strip_chars(title), True)
+    rename_by_tag(file, 'encodedby', file, True)
+
+def rename_by_tag(file, tag = None, value = None, do_not_rename = False, recurse = True):
+    if path.isdir(file):
+        for realFile in listdir(file):
+            rename_by_tag(file + '/' + realFile, tag, value, do_not_rename, True)
+        return
+
+    file = sub(r'\/+', '/', file)
+    try:
+        audio = EasyID3(file)
+    except ID3NoHeaderError:
+        print(file, 'no id3 header')
+        return
 
     if tag != None and value != None:
+        if tag not in EasyID3.valid_keys.keys():
+            print(tag, 'must be one of', EasyID3.valid_keys.keys())
+            return
         print('changing', tag, 'of', file, 'to', value)
         audio[tag] = value
         audio.save()
+
+    if do_not_rename != False:
         return
 
-    # dict_keys(['musicbrainz_discid', 'musicbrainz_albumtype', 'asin', 'tracknumber', 'version', 'musicbrainz_trmid', 'discnumber', 'musicbrainz_releasegroupid', 'isrc', 'genre', 'date', 'musicbrainz_albumstatus', 'website', 'title', 'performer:*', 'replaygain_*_peak', 'titlesort', 'musicbrainz_workid', 'album', 'composer', 'musicip_fingerprint', 'author', 'albumsort', 'catalognumber', 'musicbrainz_releasetrackid', 'musicbrainz_artistid', 'releasecountry', 'discsubtitle', 'musicip_puid', 'musicbrainz_albumid', 'language', 'barcode', 'mood', 'arranger', 'encodedby', 'musicbrainz_albumartistid', 'conductor', 'copyright', 'musicbrainz_trackid', 'originaldate', 'acoustid_fingerprint', 'artistsort', 'composersort', 'acoustid_id', 'media', 'performer', 'albumartistsort', 'bpm', 'length', 'artist', 'organization', 'replaygain_*_gain', 'compilation', 'lyricist'])
-    # print(audio)
     artist = 'Unknown'
     if 'artist' in audio:
         artist = audio['artist']
@@ -188,7 +247,6 @@ def rename_by_tag(file, tag = None, value = None, recurse = True):
     newFile = ' - '.join(['%02d' % track, folderify(artist), folderify(title)]) + '.mp3'
     newPath = '/'.join([newFolder, newFile])
     if file != newPath:
-        print('renaming,', file, newPath)
         rename(file, newPath)
 
 if __name__ == '__main__':

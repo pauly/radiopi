@@ -33,7 +33,7 @@ def load_favourites():
 def write_on_line_one(text):
     cad.lcd.set_cursor(0, 0)
     try:
-        cad.lcd.write('{0: <14}\n'.format(text))
+        cad.lcd.write('{0: <16}\n'.format(text))
     except:
         pass
 
@@ -101,7 +101,7 @@ def repeat(event):
                 print('move', song['id'], 'to', new_pos)
                 client.moveid(song['id'], new_pos)
         print('now play at position 1')
-        # client.play(1)
+        client.play(1)
 
 def shuffle(event):
     write_on_line_one('shuffle!')

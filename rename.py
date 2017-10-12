@@ -16,4 +16,6 @@ with connection():
         rename_by_tag(sys.argv[1])
     if len(sys.argv) == 4:
         rename_by_tag(sys.argv[1], sys.argv[2], sys.argv[3])
+    if len(sys.argv) == 5:
+        rename_by_tag(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
 
