@@ -7,39 +7,40 @@
     <input v-model="title" placeholder="title" @change="search()"/>
     <input v-model="album" placeholder="album" @change="search()"/>
     <button>Search 🔎</button> <!-- does not really do anything -->
-    <p><a @click="next()">Next track ⏩</a></p>
+    <h3><a @click="next()">Next track ⏩</a></h3>
     <pre v-if="error">{{ error }}</pre>
-    <ul v-if="tracks && tracks.length">
+    <ol v-if="tracks && tracks.length">
       <li v-for="track of tracks">
         {{track}}
         <a @click="play(track)">▶️</a>
+        <!-- still a problem with inconsistent results, sometimes a path, sometimes artist - title -->
         <a @click="addToList(track)">➕</a>
+        <a @click="remove(track)">🚮</a>
       </li>
-    </ul>
+    </ol>
+    <h3 v-if="playlists && playlists.length">Playlists (click to expand)</h3>
     <ul v-if="playlists && playlists.length">
       <li v-for="(list, listID) of playlists" @click="changeList(listID)">
         <h2>
-          <!-- <a @click="changeList(listID)">{{ list.name }}</a> -->
           {{ list.name }}
           <a @click="playList(listID)">▶️</a>
           <a @click="shuffle(listID)">🔀</a>
           <a @click="removeList(listID)">🚮</a>
         </h2>
-        <ol>
-          <li v-for="(track, trackID) of list.tracks">
-            {{track}}
-            <a @click="play(track, listID)">▶️</a>
-            <a @click="removeFromList(trackID, listID)">🚮</a>
-          </li>
-        </ol>
       </li>
     </ul>
-    <p><a @click="addList()">New playlist ➕</a></p>
-    <div v-if="tags && tags.length">
-      <ul class="tags">
-        <li v-for="tag of tags">{{ tag }}</li>
-      </ul>
-    </div>
+    <h3><a @click="addList()">New playlist ➕</a></h3>
+    <h3>Excuses:</h3>
+    <ol>
+      <li>you can't edit one playlist while listening to another</li>
+      <li>you can't reorder a playlist yet, coming soon</li>
+      <li>might be slow</li>
+      <li>still a bit crap</li>
+    </ol>
+    <h3 v-if="genres.length">Genres:</h3>
+    <p v-if="genres.length" class="genres">
+      <button v-for="genre of genres" @click="searchByGenre(genre)">{{ genre }}</button>
+    </p>
   </div>
 </template>
 
@@ -52,6 +53,7 @@ export default {
     return {
       term: '',
       playing: '',
+      genres: [],
       track: '',
       status: '',
       toggles: '',
@@ -70,10 +72,9 @@ export default {
       this._getStatus()
     })
     .catch(this._error)
-    axios.get(`/tags`)
+    axios.get(`/genres`)
     .then(response => {
-      console.log('tags got', response.data)
-      this.tags = response.data.tracks // @yeah everything is tracks at the moment
+      this.genres = response.data.tracks // @yeah everything is tracks at the moment
     })
     .catch(this._error)
   },
@@ -104,7 +105,7 @@ export default {
       this.changeList(id)
       axios.get(`/play?v=${track}`)
       .then(response => {
-        console.log('▶️ got response', response)
+        // console.log('▶️ got response', response)
         this.playing = track
         this._getStatus()
       })
@@ -112,15 +113,14 @@ export default {
     },
     addList () {
       const name = ('' + new Date()).substr(0, 21).replace(/\W/g, '')
-      const playlist = { name, tracks: [] }
-      this.saveList(playlist)
+      this.playlists.push({ name, tracks: [] })
+      this.changeList(this.playlists.length - 1)
+      // don't need to save it until we add a track to it
     },
     saveList (playlist) {
-      this.playlists.push(playlist)
       axios.post('/saveList', playlist)
       .then(() => {
         console.log('also change to this list locally')
-        // this.changeList(this.playlists.length - 1)
       })
       .catch(this._error)
     },
@@ -151,6 +151,8 @@ export default {
         // if (this.playlists[id].tracks) return
         // if (this.playlists[id].tracks.length) return
         this.playlists[id].tracks = response.data.tracks
+        // good idea? show the tracks in the main bit instead
+        this.tracks = response.data.tracks
       })
       .catch(this._error)
     },
@@ -159,20 +161,47 @@ export default {
       this.playList(id)
     },
     playList (id) {
+      console.log('this should be "load playlist", @todo split it out from just "view playlist"')
       this.changeList(id)
       this.play()
     },
-    removeFromList (trackID, listID) {
-      this.playlists[listID].tracks.splice(trackID, 1)
-      this.saveList(this.playlists[listID])
+    remove (track) {
+      const playlist = this.playlists[this.playlist].name
+      console.log('remove', track, playlist)
+      axios.delete(`/track?track=${track}&playlist=${playlist}`)
+      .then(response => {
+        this.error = response.data.error
+        this.playlists[this.playlist].tracks = this.playlists[this.playlist].tracks.filter(item => {
+          console.log(item, '==', track, '?')
+          return item !== track
+        })
+      })
+      // @todo filter here for quick response
+    },
+    searchByGenre (genre) {
+      console.log('genre', genre, 'was', this.genres[genre])
+      this.genres[genre] = !this.genres[genre]
+      /* const query = Object.keys(this.genres)
+        .filter(genre => this.genres[genre])
+        .map(genre => `genres[]=${genre}`)
+        .join('&') */
+      axios.get(`/search?genre=${genre}`)
+      .then(response => {
+        this.tracks = response.data.tracks
+      })
+      .catch(this._error)
     },
     search () {
-      const query = ['artist', 'title', 'album']
+      /* const query = ['artist', 'title', 'album']
         .filter(term => this[term])
         .map(term => `${term}=${this[term]}`)
         .join('&')
-      // axios.get('/search', { foo: 'bar' }) not working on this version
-      axios.get(`/search?${query}`)
+      axios.get(`/search?${query}`) */
+      // axios.get('/search', { foo: 'bar' }) not working on this version?
+      const artist = this.artist
+      const title = this.title
+      const album = this.album
+      axios.get(`/search`, { params: { artist, title, album } })
       .then(response => {
         this.tracks = response.data.tracks
       })
@@ -191,12 +220,11 @@ input, button {
   font-size: 1.5em;
 }
 a {
+  margin-right: 1.5em;
   color: #42b983;
 }
-ul.tags {
-  list-style: none;
-}
-ul.tags li {
-  display: inline;
+.genres button {
+  font-size: 0.9em;
+  margin: 0.5em;
 }
 </style>

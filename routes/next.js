@@ -1,7 +1,5 @@
 const mpc = require('../lib/mpc')
 
 module.exports = {
-  handler(req, res, next) {
-    mpc.handler('mpc next; mpc', req, res, next)
-  }
+  handler: mpc.handler.bind(this, 'mpc next; mpc')
 }
