@@ -1,15 +1,25 @@
-const mcp = require('../lib/mpc')
+const mpc = require('../lib/mpc')
 
 module.exports = {
   method: 'post',
   handler(req, res, next) {
-    console.log('saveList', req.body)
-    const name = mcp.clean(req.body.name)
-    mpc.exec('mpc playlist', (error, response) => {
-      console.log('current playlist is', response.split('\n'), 'should be the same')
-      // mpc.exec('mpc save ' + name, (error, response) => {
-        req.json(mpc.empty(error))
-      // })
+    const name = mpc.clean(req.body.name)
+    mpc.exec('mpc lsplaylists', (err, response) => {
+      // console.log('is', name, 'in', response, '?')
+      var cmd = req.body.tracks.map(track => 'mpc add "' + track + '"') // @todo well insecure
+      cmd.unshift('mpc save ' + name)
+      if (response.indexOf(name) === -1) {
+        console.log(name, 'is a new playlist so we are ok... save', req.body.tracks)
+      } else {
+        console.log(name, 'already exists, so load it, remove it, and add', req.body.tracks)
+        // in reverse order
+        cmd.unshift('mpc rm ' + name)
+        // cmd.unshift('mpc load ' + name)
+      }
+      mpc.exec(cmd.join('; '), (err, response) => {
+        if (err) return res.json(mpc.empty(err))
+        res.json(req.body.tracks)
+      })
     })
   }
 }
