@@ -5,7 +5,7 @@
 /usr/bin/mpc rm _incoming 2>/dev/null # may not exist
 /usr/bin/mpc save _incoming
 
-/usr/bin/mpc listall | sort -R | head -100 | /usr/bin/mpc add
+/usr/bin/mpc listall | sort -R | head -200 | grep -v _spoken | grep -v _classical | /usr/bin/mpc add
 /usr/bin/mpc add _incoming
 /usr/bin/mpc shuffle
 /home/pi/radiopi/party.py

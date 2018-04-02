@@ -12,7 +12,7 @@ from random import randint
 from connection import connection, client
 from tagr import tag_it, get_tags, get_rating, load_tags
 
-ignore = ('NSFK', 'Podcast', 'Classical', 'Remix', 'Audiobook', 'Spoken Word', 'Live')
+ignore = ('NSFK', 'Podcast', 'Classical', 'Remix', 'Audiobook', 'Spoken Word', 'Live', 'Christmas')
 tag_weight = load_tags()
 
 with connection():
