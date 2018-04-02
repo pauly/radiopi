@@ -7,7 +7,7 @@ const debug = require('debug')('radiopi:server')
 const chalk = require('chalk')
 const childProcess = require('child_process')
 const jsmediatags = require('jsmediatags')
- 
+
 const lib = module.exports = {
   _mpc: null,
   _io: null,

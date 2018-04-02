@@ -2,8 +2,7 @@ const lib = require('../lib')
 
 module.exports = {
   handler(req, res, next) {
-    var cmd = 'mpc playlist "' + lib.clean(req.query.v) + '"'
-    console.log(cmd)
+    var cmd = 'mpc clear && mpc load "' + lib.clean(req.query.v) + '" && mpc playlist'
     lib.handler(cmd, req, res, next)
   }
 }

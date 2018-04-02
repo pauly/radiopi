@@ -21,7 +21,6 @@
     <h3><a @click="addList()">New playlist ➕</a></h3>
     <h3>Excuses (coming soon):</h3>
     <ul>
-      <li>adding to playlist not working</li>
       <li>you can't edit one playlist while listening to another</li>
       <li>you can't reorder a playlist yet</li>
       <li>might be slow</li>
@@ -49,12 +48,12 @@ export default {
           return lists
         }, {})
       })
-      .catch(this._error)
+      .catch(this.error)
   },
   methods: {
     addList () {
       const name = ('' + new Date()).substr(0, 21).replace(/\W/g, '')
-      this.playlists[name] = []
+      // this.playlists[name] = []
       this.changeList(name)
       // don't need to save it until we add a track to it
     },
@@ -62,32 +61,32 @@ export default {
       console.log('@todo, shuffle 🔀')
       this.playList(id)
     }, */
+    error (error) {
+      this.$emit('error', error)
+    },
     play (track) {
       this.$emit('play', track)
     },
     changeList (name) {
       if (name === undefined) return
       if (name === this.playlist) return
-      this.$emit('changeList', name)
       axios.get(`/changeList?v=${name}`)
         .then(response => {
-          this.playlists[name] = response.data.tracks
-          // good idea? show the tracks in the main bit instead
-          this.tracks = response.data.tracks
+          this.$emit('changeList', name, response.data.tracks)
         })
-        .catch(this._error)
+        .catch(this.error)
     },
-    remove (track) {
+    remove (track) { // @todo not working
       console.log('remove', track, this.playlist)
       axios.delete(`/track?track=${track}&playlist=${this.playlist}`)
         .then(response => {
           console.log('deleted response was', response)
           this.error = response.data.error
-          console.log(this.playlist, 'had', this.playlists[this.playlist].length, 'tracks')
+          /* console.log(this.playlist, 'had', this.playlists[this.playlist].length, 'tracks')
           this.playlists[this.playlist] = this.playlists[this.playlist].filter(item => {
             return item !== track
           })
-          console.log(this.playlist, 'now has', this.playlists[this.playlist].length, 'tracks')
+          console.log(this.playlist, 'now has', this.playlists[this.playlist].length, 'tracks') */
         })
       // @todo filter here for quick response
     },
@@ -103,8 +102,8 @@ export default {
       // if (!confirm(`remove ${playlist.name} with ${playlist.tracks.length} tracks?`)) return
       if (!confirm(`remove "${name}"?`)) return
       axios.get(`/removeList?v=${name}`)
-        .catch(this._error)
-      delete this.playlists[name]
+        .catch(this.error)
+      // delete this.playlists[name]
     }
   }
 }

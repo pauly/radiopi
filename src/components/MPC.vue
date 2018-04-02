@@ -18,7 +18,7 @@
         <a @click="addToList(track)">➕</a>
       </li>
     </ol>
-    <mpc-playlists @play=play @addToList=addToList @changeList=changeList />
+    <mpc-playlists @play=play @addToList=addToList @changeList=changeList @error=error />
     <mpc-genres @searchByGenre=searchByGenre />
   </div>
 </template>
@@ -78,7 +78,7 @@ export default {
     })
   },
   methods: {
-    _error (e) {
+    error (e) {
       this.error = JSON.stringify(e, null, 2)
     },
     rate (id) {
@@ -95,32 +95,33 @@ export default {
       // socket.emit('play', track)
       // this.changeList(id)
       axios.get(`/play`, { params: { track } })
-        .catch(this._error)
+        .catch(this.error)
     },
     addToList (track) {
       console.log('add', track, 'to', this.playlist)
       axios.get(`/add`, { params: { track, playlist: this.playlist } })
-        .catch(this._error)
+        .catch(this.error)
       // const playlist = this.playlists[this.playlist]
       // playlist.tracks.push(track)
       // this.saveList(playlist)
     },
-    changeList (name) {
+    changeList (name, tracks) {
       this.playlist = name
+      this.tracks = tracks
     },
     searchByGenre (genre) {
       axios.get(`/search`, { params: { genre } })
         .then(response => {
           this.tracks = response.data.tracks
         })
-        .catch(this._error)
+        .catch(this.error)
     },
     search (artist, title, album) {
       axios.get(`/search`, { params: { artist, title, album } })
         .then(response => {
           this.tracks = response.data.tracks
         })
-        .catch(this._error)
+        .catch(this.error)
     }
   }
 }
