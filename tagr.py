@@ -12,11 +12,14 @@ from os import path, listdir, rename, makedirs
 from mutagen.id3 import ID3, POPM, TCON, ID3NoHeaderError
 from mutagen.easyid3 import EasyID3
 import json
-from re import findall, sub
+from re import findall, sub, split
 
 RATING_STEP = 32
 RECURSE = True
 baseFolder = '/mnt/share'
+
+def uc_first(name):
+  return " ".join(w.capitalize() for w in name.split())
 
 def save_tags(tag_weight):
     with open('tags.json', 'w') as outfile:
@@ -87,9 +90,6 @@ def rate_it(file, direction, recurse = True):
     save_tags(tag_weight)
     return rating
 
-def ucfirst(tag):
-    return tag[0].upper() + tag[1:]
-
 def get_tags(file):
     tags = []
     try:
@@ -116,11 +116,18 @@ def tag_it(file, tag = None, recurse = True):
 
     tags = get_tags(file)
     if tag == None:
+        print('tags were', tags)
         return tags
-    tag = ucfirst(tag)
-    if tag not in tags:
-        tags.append(tag)
-        tags.sort()
+    newTags = split('[^ \w\-]+', tag)
+    addingNewTags = False
+    for tag in newTags:
+        tag = uc_first(tag.strip())
+        if tag not in tags:
+            addingNewTags = True
+            tags.append(tag)
+    if addingNewTags == False:
+        return
+    tags.sort()
     try:
         audio = ID3(file)
     except ID3NoHeaderError:
@@ -147,7 +154,6 @@ def untag_it(file, tag = None, recurse = True):
 
     tags = get_tags(file)
     if tag != None:
-        tag = ucfirst(tag)
         for i in range(len(tags) - 1, -1, -1):
             if tags[i] == tag:
                 del tags[i]
@@ -164,6 +170,9 @@ def strip_chars(str):
     str = sub('\(.*', '', str)
     str = sub('^\W', '', str)
     str = sub('\W$', '', str)
+    str = sub(' Official Video', '', str)
+    str = sub(' Official Lyric Video', '', str)
+    str = sub(' Official Music Video', '', str)
     str = sub('[^A-Za-z0-9\s]', '', str)
     return str
 
@@ -186,9 +195,6 @@ def rename_by_file(file, recurse = True):
     if artist == 'NA':
         artist = parts[1]
         title = parts[2]
-    title = sub(' Official Video', '', title)
-    title = sub(' Official Lyric Video', '', title)
-    title = sub(' Official Music Video', '', title)
     if 'artist' not in audio:
         rename_by_tag(file, 'artist', strip_chars(artist), True)
     # if 'title' not in audio:
@@ -217,17 +223,14 @@ def rename_by_tag(file, tag = None, value = None, do_not_rename = False, recurse
         audio[tag] = value
         audio.save()
 
-    if do_not_rename != False:
-        return
-
     artist = 'Unknown'
     if 'artist' in audio:
         artist = audio['artist']
     albumArtist = artist
-    if 'compilation' in audio:
-        if '1' in audio['compilation']:
-            # print('compilation', audio['compilation'], 'so setting various artists')
-            albumArtist = ['Various']
+    # if 'compilation' in audio:
+    #     if '1' in audio['compilation']:
+    #         # print('compilation', audio['compilation'], 'so setting various artists')
+    #         albumArtist = ['Various']
     if 'albumartistsort' in audio:
         albumArtist = audio['albumartistsort']
     track = 0
@@ -239,13 +242,24 @@ def rename_by_tag(file, tag = None, value = None, do_not_rename = False, recurse
     title = ['Unknown']
     if 'title' in audio:
         title = audio['title']
-    newFolder = '/'.join([baseFolder, folderify(albumArtist), folderify(album)])
+
+    albumFolder = folderify(albumArtist)
+    parts = [baseFolder, str.lower(albumFolder[0]), albumFolder, folderify(album)]
+    if 'genre' in audio:
+        if 'Spoken Word' in audio['genre']:
+            parts = [baseFolder, '_spoken_word', folderify(albumArtist), folderify(album)]
+        if 'Classical' in audio['genre']:
+            parts = [baseFolder, '_classical', folderify(albumArtist), folderify(album)]
+    newFolder = '/'.join(parts)
+    newFile = ' - '.join(['%02d' % track, folderify(artist), folderify(title)]) + '.mp3'
+    newPath = '/'.join([newFolder, newFile])
+    if do_not_rename != False:
+        print('would be', newPath)
+        return
     try:
         makedirs(newFolder)
     except:
         pass
-    newFile = ' - '.join(['%02d' % track, folderify(artist), folderify(title)]) + '.mp3'
-    newPath = '/'.join([newFolder, newFile])
     if file != newPath:
         rename(file, newPath)
 
